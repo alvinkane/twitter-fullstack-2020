@@ -89,6 +89,7 @@ const profileController = {
       const tweetsData = tweets.rows.map(tweet => tweet.toJSON())
       // pagination
       const pagination = getPagination(page, limit, tweets.count.length)
+      console.log(userData)
       // render
       res.render('users/tweets', { user: userData, tweets: tweetsData, route, pagination })
     } catch (err) {
