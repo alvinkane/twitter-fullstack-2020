@@ -5,23 +5,10 @@ const coverImg = document.querySelector('.cover-img')
 const avatarImg = document.querySelector('.avatar-img')
 const inputName = document.querySelector('.input-name')
 const inputIntroduction = document.querySelector('.input-introduction')
-const editButton = document.querySelector('.edit-btn')
 
 // 自定變數
 const maxName = 50
 const maxIntroduction = 160
-// 紀錄modal有無送出
-let buttonPressed = false
-// 紀錄原始圖片
-const originCoverImg = coverImg.src
-const originAvatarImg = avatarImg.src
-
-editButton.addEventListener('click', () => {
-  if (!buttonPressed) {
-    coverImg.src = originCoverImg
-    avatarImg.src = originAvatarImg
-  }
-})
 
 inputForm.addEventListener('input', event => {
   const { target } = event
@@ -46,14 +33,9 @@ inputForm.addEventListener('input', event => {
   if (target.name === 'avatar') {
     previewFile(target, avatarImg)
   }
-
-  if (target.name === 'coverDelete') {
-    coverImg.src = '/images/profile/cover.png'
-  }
 })
 
 inputForm.addEventListener('submit', event => {
-  submitButton()
   if (!inputForm.checkValidity()) {
     event.stopPropagation()
     event.preventDefault()
@@ -77,9 +59,4 @@ function checkLength(target, length, maxLength) {
   } else {
     target.setCustomValidity('')
   }
-}
-
-// 用於modal的按鈕有無被觸發
-function submitButton() {
-  return (buttonPressed = true)
 }

@@ -3,10 +3,6 @@ const bcrypt = require('bcryptjs')
 const helpers = require('../_helpers')
 const { imgurFileHelper } = require('../helpers/file-helpers')
 const { User, Followship, Tweet, Reply, Like } = require('../models')
-const { getOffset, getPagination } = require('../helpers/pagination-helper')
-
-// 推文顯示數量
-const DEFAULT_LIMIT = 50
 
 const profileController = {
   getUser: async (req, res, next) => {
@@ -14,8 +10,6 @@ const profileController = {
     const loginUser = helpers.getUser(req)
     const { userId } = req.params
     try {
-      // 判斷session儲存的資料是否跟req相同
-      if (req.session.userData?.id === userId) return next()
       // 取對應的user資料，包含following跟follower的count
       const [user, FollowingsCount, FollowersCount, tweetsCount] = await Promise.all([
         User.findByPk(userId),
@@ -36,8 +30,8 @@ const profileController = {
       if (!user) throw new Error('該用戶不存在!')
       // 變數存，user是否為使用者
       const isLoginUser = user.id === loginUser.id
-      // 將變數加入session
-      req.session.userData = {
+      // 將變數加入
+      req.userData = {
         ...user.toJSON(),
         cover: user.cover || '/images/profile/cover.png',
         avatar: user.avatar || 'https://ionicframework.com/docs/img/demos/avatar.svg',
@@ -47,25 +41,20 @@ const profileController = {
         isLoginUser
       }
       // next
-      return next()
+      next()
     } catch (err) {
       next(err)
     }
   },
   getUserTweets: async (req, res, next) => {
-    const { userData } = req.session
+    const { userData } = req
     // 取得 id
     const { userId } = req.params
 
-    const route = `users/${userId}/tweets`
-    // 取得page, limit, offset
-    const page = Number(req.query.page) || 1
-    const limit = DEFAULT_LIMIT
-    const offset = getOffset(page, limit)
     try {
       // tweets找相對應的資料，跟user關聯，依照建立時間排列
       // replies、likes數量計算
-      const tweets = await Tweet.findAndCountAll({
+      const tweets = await Tweet.findAll({
         attributes: {
           include: [
             [Sequelize.fn('COUNT', Sequelize.col('Replies.id')), 'repliesCount'],
@@ -80,34 +69,22 @@ const profileController = {
           { model: Like, attributes: [] }
         ],
         order: [['createdAt', 'DESC']],
-        group: ['Tweet.id'],
-        limit,
-        offset,
-        subQuery: false
+        group: ['Tweet.id']
       })
       // 整理資料
-      const tweetsData = tweets.rows.map(tweet => tweet.toJSON())
-      // pagination
-      const pagination = getPagination(page, limit, tweets.count.length)
-      console.log(userData)
-      // render
-      res.render('users/tweets', { user: userData, tweets: tweetsData, route, pagination })
+      const tweetsData = tweets.map(tweet => tweet.toJSON())
+      res.render('users/tweets', { user: userData, tweets: tweetsData })
     } catch (err) {
       next(err)
     }
   },
   getUserReplies: async (req, res, next) => {
-    const { userData } = req.session
+    const { userData } = req
     // 取得userId
     const { userId } = req.params
-    const route = `users/${userId}/replies`
-    // 取得page, limit, offset
-    const page = Number(req.query.page) || 1
-    const limit = DEFAULT_LIMIT
-    const offset = getOffset(page, limit)
     try {
       // 取得reply資料及回覆的推文者
-      const replies = await Reply.findAndCountAll({
+      const replies = await Reply.findAll({
         where: { UserId: userId },
         include: [
           {
@@ -119,41 +96,30 @@ const profileController = {
             // 不能是空的
             attributes: ['id']
           }
-        ],
-        limit,
-        offset
+        ]
       })
       // 整理資料
-      const repliesData = replies.rows.map(reply => reply.toJSON())
-      // pagination
-      const pagination = getPagination(page, limit, replies.count)
+      const repliesData = replies.map(reply => reply.toJSON())
       // render
-      res.render('users/replies', { user: userData, replies: repliesData, route, pagination })
+      res.render('users/replies', { user: userData, replies: repliesData })
     } catch (err) {
       next(err)
     }
   },
   getUserLikes: async (req, res, next) => {
-    const { userData } = req.session
+    const { userData } = req
     const { userId } = req.params
-    const route = `users/${userId}/likes`
-    // 取得page, limit, offset
-    const page = Number(req.query.page) || 1
-    const limit = DEFAULT_LIMIT
-    const offset = getOffset(page, limit)
     try {
       // likes找相對應的資料，跟user推文者關聯，依照like建立時間排列
-      const likes = await Like.findAndCountAll({
+      const likes = await Like.findAll({
         where: { UserId: userId },
         include: [Tweet],
-        order: [['createdAt', 'DESC']],
-        limit,
-        offset
+        order: [['createdAt', 'DESC']]
       })
       // 透過likeId找對應的tweet資料
       // replies、likes數量計算
       const tweets = await Promise.all(
-        likes.rows.map(like => {
+        likes.map(like => {
           return Tweet.findByPk(like.TweetId, {
             attributes: {
               include: [
@@ -172,28 +138,20 @@ const profileController = {
         })
       )
       // 整理資料
-      const tweetsData = tweets.map(tweet => ({ ...tweet?.toJSON() }))
-      // pagination
-      const pagination = getPagination(page, limit, likes.count)
+      const tweetsData = tweets.map(tweet => tweet.toJSON())
       // render
-      res.render('users/likes', { user: userData, tweets: tweetsData, pagination, route })
+      res.render('users/likes', { user: userData, tweets: tweetsData })
     } catch (err) {
       next(err)
     }
   },
   getUserFollowings: async (req, res, next) => {
-    const loginUser = helpers.getUser(req)
     const { userId } = req.params
     // 判斷active
     const followings = true
-    const route = `users/${userId}/followings`
-    // 取得page, limit, offset
-    const page = Number(req.query.page) || 1
-    const limit = DEFAULT_LIMIT
-    const offset = getOffset(page, limit)
     try {
       // 取對應的user資料、包含追隨的人、推文數
-      const [user, tweetsCount, followingsCount] = await Promise.all([
+      const [user, tweetsCount] = await Promise.all([
         User.findByPk(userId, {
           include: [
             {
@@ -201,42 +159,20 @@ const profileController = {
               as: 'Followings',
               order: [['createdAt', 'DESC']]
             }
-          ],
-          limit,
-          offset
+          ]
         }),
         Tweet.count({
           where: { UserId: userId }
-        }),
-        Followship.count({
-          where: { followerId: userId }
         })
       ])
       // 判斷user是否存在，沒有就err
       if (!user) throw new Error('帳號不存在!')
-      // 判斷是否loginUser是否有追隨該user清單
-      const isFollowing =
-        // 清單中的id是否跟loginUser追蹤的id相同
-        user.Followings.map(following => {
-          return loginUser.Followings.some(f => f.id === following.id)
-        })
 
       const userData = {
         ...user.toJSON(),
         tweetsCount
       }
-      // 將isFollowing加入其中
-      userData.Followings.forEach((following, index) => {
-        following.isFollowing = isFollowing[index]
-      })
-      // 根據isFollowing排序
-      userData.Followings.sort((a, b) => {
-        if (loginUser.id === a.id || loginUser.id === b.id) return -1
-        return b.isFollowing - a.isFollowing
-      })
-      // pagination
-      const pagination = getPagination(page, limit, followingsCount)
-      res.render('users/followings', { user: userData, followings, pagination, route })
+      res.render('users/followings', { user: userData, followings })
     } catch (err) {
       next(err)
     }
@@ -246,21 +182,14 @@ const profileController = {
     const { userId } = req.params
     // 判斷active
     const followers = true
-    const route = `users/${userId}/followers`
-    // 取得page, limit, offset
-    const page = Number(req.query.page) || 1
-    const limit = DEFAULT_LIMIT
-    const offset = getOffset(page, limit)
     try {
       // 取對應的user資料、包含追隨的人、推文數
-      const [user, tweetsCount, followersCount] = await Promise.all([
+      const [user, tweetsCount] = await Promise.all([
         User.findByPk(userId, {
           include: [
             // Followers
             { model: User, as: 'Followers', order: [['createdAt', 'DESC']] }
-          ],
-          limit,
-          offset
+          ]
         }),
         Tweet.count({
           where: { UserId: userId }
@@ -272,25 +201,11 @@ const profileController = {
 
       // 判斷user是否存在，沒有就err
       if (!user) throw new Error('帳號不存在!')
-      // 判斷是否loginUser是否有追隨該user清單
-      const isFollowing =
-        // 清單中的id是否跟loginUser追蹤的id相同
-        user.Followers.map(follower => {
-          return loginUser.Followings.some(f => f.id === follower.id)
-        })
       const userData = {
         ...user.toJSON(),
         tweetsCount
       }
-      // 將isFollowing加入其中
-      userData.Followers.forEach((follower, index) => {
-        follower.isFollowing = isFollowing[index]
-      })
-      // 根據isFollowing排序
-      userData.Followers.sort((a, b) => b.isFollowing - a.isFollowing)
-      // pagination
-      const pagination = getPagination(page, limit, followersCount)
-      res.render('users/followers', { user: userData, followers, pagination, route })
+      res.render('users/followers', { user: userData, followers })
     } catch (err) {
       next(err)
     }
