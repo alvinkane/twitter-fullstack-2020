@@ -16,6 +16,7 @@ const helpers = {
   ...handlebarsHelpers,
   ...partialHelpers
 }
+const previousPage = require('./middleware/previous-page')
 
 // files
 const helpers = require('./_helpers')
@@ -46,12 +47,16 @@ app.use(passport.session())
 
 app.use(methodOverride('_method'))
 
+app.use(previousPage)
+
 app.use((req, res, next) => {
   res.locals.success_messages = req.flash('success_messages')
   res.locals.error_messages = req.flash('error_messages')
   // 為了不跟user的資料衝突，所以更換名字
   res.locals.loginUser = helpers.getUser(req)
   res.locals.isAuthenticated = helpers.ensureAuthenticated(req)
+  // 上一頁
+  res.locals.previousPage = req.session.previousPage
   next()
 })
 

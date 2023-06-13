@@ -29,6 +29,7 @@ router.post(
 
 // signup
 router.get('/signup', userController.signupPage)
+router.post('/signup', userController.signup)
 
 // logout
 router.get('/logout', userController.logout)
@@ -63,7 +64,7 @@ router.put(
 )
 
 // followship
-router.post('/followships/:userId', authenticated, followshipController.addFollowing)
+router.post('/followships', authenticated, followshipController.addFollowing)
 router.delete('/followships/:userId', authenticated, followshipController.removeFollowing)
 
 // api
