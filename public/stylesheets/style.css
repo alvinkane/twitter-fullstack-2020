@@ -450,9 +450,6 @@ h5 {
 
 .tweet-text {
   margin-left: 8px;
-  overflow-wrap: break-word;
-  box-sizing: border-box;
-  width: calc(100% - 54px);
 
   /* limit excessive width */
   box-sizing: border-box;
